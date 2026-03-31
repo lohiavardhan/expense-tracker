@@ -279,9 +279,6 @@ def generate_dashboard(**context):
         print("Skipping dashboard generation (not on AWS)")
         return
 
-    import pandas as pd
-    import duckdb
-
     # Read all parquet files from warehouse
     paginator = s3.get_paginator('list_objects_v2')
     frames = []
