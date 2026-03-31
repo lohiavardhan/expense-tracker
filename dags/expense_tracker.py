@@ -184,12 +184,24 @@ def parse_emails(banking=None, **context):
         to_merchant = re.search(r'To:\s*(.+?)(?:\s*\(UEN|\s*If\s|(?:\s{2,}|\n))', text)
         from_card = re.search(r'From:\s*(.+?)(?:\s{2,}|\n)', text)
 
+        raw_date = date_match.group(1).strip() if date_match else None
+        parsed_date = None
+
+        if raw_date:
+            for fmt in ('%d %b %Y %I:%M %p', '%d %b %Y %H:%M', '%d/%m/%Y %I:%M %p'):
+                try:
+                    parsed_date = datetime.strptime(raw_date, fmt).isoformat()
+                    break
+                except ValueError:
+                    pass
+
         date_prefix = datetime.now().strftime('%Y/%m/%d')
         s3_raw_path = f"s3://{S3_BUCKET}/raw/{date_prefix}/{detail['id']}.json" if IS_AWS else None
 
         transactions.append({
             'email_id': detail['id'],
-            'date': date_match.group(1).strip() if date_match else None,
+            'date_raw': raw_date,
+            'date': parsed_date,
             'from_account': from_card.group(1).strip() if from_card else None,
             'to_merchant': to_merchant.group(1).strip() if to_merchant else None,
             'subject': subject,
@@ -308,22 +320,22 @@ def generate_dashboard(**context):
     """).df()
 
     daily_spend = con.execute("""
-        SELECT date,
-               ROUND(SUM(CAST(REPLACE(REPLACE(amount, 'SGD', ''), ',', '') AS DOUBLE)), 2) AS total
-        FROM df
-        WHERE date IS NOT NULL
-        GROUP BY date
-        ORDER BY date
+    SELECT CAST(TRY_CAST(date AS TIMESTAMP) AS DATE) AS day,
+           ROUND(SUM(CAST(REPLACE(REPLACE(amount, 'SGD', ''), ',', '') AS DOUBLE)), 2) AS total
+    FROM df
+    WHERE TRY_CAST(date AS TIMESTAMP) IS NOT NULL
+    GROUP BY day
+    ORDER BY day
     """).df()
 
     monthly_spend = con.execute("""
-        SELECT STRFTIME(CAST(date AS DATE), '%Y-%m') AS month,
-               COUNT(*) AS count,
-               ROUND(SUM(CAST(REPLACE(REPLACE(amount, 'SGD', ''), ',', '') AS DOUBLE)), 2) AS total
-        FROM df
-        WHERE date IS NOT NULL
-        GROUP BY month
-        ORDER BY month
+    SELECT STRFTIME(TRY_CAST(date AS TIMESTAMP), '%Y-%m') AS month,
+           COUNT(*) AS count,
+           ROUND(SUM(CAST(REPLACE(REPLACE(amount, 'SGD', ''), ',', '') AS DOUBLE)), 2) AS total
+    FROM df
+    WHERE TRY_CAST(date AS TIMESTAMP) IS NOT NULL
+    GROUP BY month
+    ORDER BY month
     """).df()
 
     dashboard_data = {
@@ -366,7 +378,8 @@ if IS_AIRFLOW:
         t3 = PythonOperator(task_id='load_to_warehouse', python_callable=load_to_warehouse)
         t4 = PythonOperator(task_id='generate_dashboard', python_callable=generate_dashboard)
 
-        t1 >> [t_lake, t2] >> t3 >> t4
+        t1 >> t_lake
+        t1 >> t2 >> t3 >> t4
 
 
 # LOCAL EXECUTION FOR MAC
