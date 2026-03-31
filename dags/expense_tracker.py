@@ -119,13 +119,6 @@ def fetch_emails(**context):
         if from_header and 'ibanking.alert@dbs.com' in from_header:
             banking_emails.append(detail)
 
-            # Save raw JSON to S3 data lake
-            date_prefix = datetime.now().strftime('%Y/%m/%d')
-            save_to_s3(
-                f"raw/{date_prefix}/{detail['id']}.json",
-                json.dumps(detail),
-            )
-
     print(f"Fetched {len(banking_emails)} banking emails")
 
     # Airflow mode: push to XCom
@@ -133,6 +126,32 @@ def fetch_emails(**context):
         context['ti'].xcom_push(key='banking', value=banking_emails)
 
     return banking_emails
+
+
+# LOAD TO LAKE
+def load_to_lake(banking=None, **context):
+    # Airflow mode: pull from XCom
+    if banking is None and context.get('ti'):
+        banking = context['ti'].xcom_pull(task_ids='fetch_emails', key='banking')
+
+    if not banking:
+        print("No emails to save to lakehouse")
+        return
+
+    if not IS_AWS:
+        print(f"Skipping lakehouse save (not on AWS) — {len(banking)} emails")
+        return
+
+    date_prefix = datetime.now().strftime('%Y/%m/%d')
+    saved = 0
+    for detail in banking:
+        save_to_s3(
+            f"raw/{date_prefix}/{detail['id']}.json",
+            json.dumps(detail),
+        )
+        saved += 1
+
+    print(f"Saved {saved} raw emails to s3://{S3_BUCKET}/raw/{date_prefix}/")
 
 
 # PARSE EMAIL
@@ -242,6 +261,90 @@ def load_to_warehouse(transactions=None, **context):
     print(f"Wrote {len(new_transactions)} new transactions to warehouse")
 
 
+# GENERATE DASHBOARD DATA
+def generate_dashboard(**context):
+    if not IS_AWS:
+        print("Skipping dashboard generation (not on AWS)")
+        return
+
+    import pandas as pd
+    import duckdb
+
+    # Read all parquet files from warehouse
+    paginator = s3.get_paginator('list_objects_v2')
+    frames = []
+    for page in paginator.paginate(Bucket=S3_BUCKET, Prefix='warehouse/'):
+        for obj in page.get('Contents', []):
+            if obj['Key'].endswith('.parquet'):
+                response = s3.get_object(Bucket=S3_BUCKET, Key=obj['Key'])
+                buf = io.BytesIO(response['Body'].read())
+                frames.append(pq.read_table(buf).to_pandas())
+
+    if not frames:
+        print("No warehouse data found for dashboard")
+        return
+
+    df = pd.concat(frames, ignore_index=True)
+    con = duckdb.connect()
+
+    spend_by_type = con.execute("""
+        SELECT type,
+               COUNT(*) AS count,
+               ROUND(SUM(CAST(REPLACE(REPLACE(amount, 'SGD', ''), ',', '') AS DOUBLE)), 2) AS total
+        FROM df
+        GROUP BY type
+        ORDER BY total DESC
+    """).df()
+
+    top_merchants = con.execute("""
+        SELECT to_merchant,
+               COUNT(*) AS count,
+               ROUND(SUM(CAST(REPLACE(REPLACE(amount, 'SGD', ''), ',', '') AS DOUBLE)), 2) AS total
+        FROM df
+        WHERE to_merchant IS NOT NULL
+        GROUP BY to_merchant
+        ORDER BY total DESC
+        LIMIT 10
+    """).df()
+
+    daily_spend = con.execute("""
+        SELECT date,
+               ROUND(SUM(CAST(REPLACE(REPLACE(amount, 'SGD', ''), ',', '') AS DOUBLE)), 2) AS total
+        FROM df
+        WHERE date IS NOT NULL
+        GROUP BY date
+        ORDER BY date
+    """).df()
+
+    monthly_spend = con.execute("""
+        SELECT STRFTIME(CAST(date AS DATE), '%Y-%m') AS month,
+               COUNT(*) AS count,
+               ROUND(SUM(CAST(REPLACE(REPLACE(amount, 'SGD', ''), ',', '') AS DOUBLE)), 2) AS total
+        FROM df
+        WHERE date IS NOT NULL
+        GROUP BY month
+        ORDER BY month
+    """).df()
+
+    dashboard_data = {
+        'generated_at': datetime.now().isoformat(),
+        'total_transactions': len(df),
+        'spend_by_type': spend_by_type.to_dict(orient='records'),
+        'top_merchants': top_merchants.to_dict(orient='records'),
+        'daily_spend': daily_spend.to_dict(orient='records'),
+        'monthly_spend': monthly_spend.to_dict(orient='records'),
+    }
+
+    s3.put_object(
+        Bucket=S3_BUCKET,
+        Key='dashboard/latest.json',
+        Body=json.dumps(dashboard_data).encode(),
+        ContentType='application/json',
+    )
+
+    print(f"Dashboard data saved: {len(df)} transactions across {len(daily_spend)} days")
+
+
 # AIRFLOW DAG
 if IS_AIRFLOW:
     from airflow import DAG
@@ -258,17 +361,21 @@ if IS_AIRFLOW:
     ) as dag:
 
         t1 = PythonOperator(task_id='fetch_emails', python_callable=fetch_emails)
+        t_lake = PythonOperator(task_id='load_to_lake', python_callable=load_to_lake)
         t2 = PythonOperator(task_id='parse_emails', python_callable=parse_emails)
         t3 = PythonOperator(task_id='load_to_warehouse', python_callable=load_to_warehouse)
+        t4 = PythonOperator(task_id='generate_dashboard', python_callable=generate_dashboard)
 
-        t1 >> t2 >> t3
+        t1 >> [t_lake, t2] >> t3 >> t4
 
 
-# ── Local execution (Mac) ──────────────────────────────────────────
+# LOCAL EXECUTION FOR MAC
 if __name__ == '__main__':
     print(f"Running {'on AWS' if IS_AWS else 'locally on Mac'}")
     print(f"Token path: {TOKEN_PATH}\n")
 
     banking = fetch_emails()
+    load_to_lake(banking)
     transactions = parse_emails(banking)
     load_to_warehouse(transactions)
+    generate_dashboard()

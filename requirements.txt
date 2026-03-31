@@ -1,3 +1,10 @@
 google-api-python-client
 google-auth-httplib2
 google-auth-oauthlib
+boto3
+pyarrow
+duckdb
+pandas
+streamlit
+beautifulsoup4
+python-dotenv
