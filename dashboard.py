@@ -27,7 +27,7 @@ except Exception as e:
 
 st.caption(f"Last updated: {data['generated_at']}")
 
-# ── DataFrames ───────────────────────────────────────────────────────────────
+# Data
 df_daily = pd.DataFrame(data.get("daily_spend", []))
 df_monthly = pd.DataFrame(data.get("monthly_spend", []))
 df_type = pd.DataFrame(data.get("spend_by_type", []))
@@ -35,46 +35,57 @@ df_merchants = pd.DataFrame(data.get("top_merchants", []))
 
 current_month = pd.Timestamp.now().strftime("%Y-%m")
 
-# Total transactions this month
+# total transactions this month
 transactions_this_month = 0
-if not df_monthly.empty and current_month in df_monthly["month"].values:
-    month_row = df_monthly.loc[df_monthly["month"] == current_month]
-    if "count" in month_row.columns and not month_row.empty:
-        transactions_this_month = int(month_row["count"].iloc[0])
+if not df_monthly.empty and "month" in df_monthly.columns and "count" in df_monthly.columns:
+    match = df_monthly.loc[df_monthly["month"] == current_month, "count"]
+    if not match.empty:
+        transactions_this_month = int(match.iloc[0])
 
-# Card / PayNow totals
+# card / paynow totals
 card_total = 0.0
 paynow_total = 0.0
 
-if not df_type.empty:
-    type_normalized = df_type.copy()
-    type_normalized["type_normalized"] = type_normalized["type"].astype(str).str.strip().str.lower()
+if not df_type.empty and "type" in df_type.columns and "total" in df_type.columns:
+    tmp = df_type.copy()
+    tmp["type_norm"] = tmp["type"].astype(str).str.strip().str.lower()
 
-    card_match = type_normalized.loc[type_normalized["type_normalized"] == "card", "total"]
-    paynow_match = type_normalized.loc[type_normalized["type_normalized"] == "paynow", "total"]
+    card_match = tmp.loc[tmp["type_norm"] == "card", "total"]
+    paynow_match = tmp.loc[tmp["type_norm"] == "paynow", "total"]
 
-    card_total = float(card_match.iloc[0]) if not card_match.empty else 0.0
-    paynow_total = float(paynow_match.iloc[0]) if not paynow_match.empty else 0.0
+    if not card_match.empty:
+        card_total = float(card_match.iloc[0])
+    if not paynow_match.empty:
+        paynow_total = float(paynow_match.iloc[0])
 
-# Top 5 merchants
-if not df_merchants.empty:
+# top 5 merchants
+if not df_merchants.empty and "total" in df_merchants.columns:
     df_merchants = df_merchants.sort_values("total", ascending=False).head(5)
 
-# ── Top metrics ──────────────────────────────────────────────────────────────
+# charts row
 col1, col2, col3 = st.columns(3)
 
 with col1:
     st.subheader("Daily Spend (SGD)")
     if not df_daily.empty:
-        df_daily["date"] = pd.to_datetime(df_daily["date"], errors="coerce")
-        df_daily = df_daily.dropna(subset=["date"]).set_index("date").sort_index()
-        st.line_chart(df_daily["total"], use_container_width=True)
+        # support either "date" or "day" from backend
+        date_col = "date" if "date" in df_daily.columns else "day" if "day" in df_daily.columns else None
+
+        if date_col:
+            df_daily[date_col] = pd.to_datetime(df_daily[date_col], errors="coerce")
+            df_daily = df_daily.dropna(subset=[date_col]).set_index(date_col).sort_index()
+            if "total" in df_daily.columns and not df_daily.empty:
+                st.line_chart(df_daily["total"], use_container_width=True)
+            else:
+                st.info("No data")
+        else:
+            st.info("No data")
     else:
         st.info("No data")
 
 with col2:
     st.subheader("Monthly Spend (SGD)")
-    if not df_monthly.empty:
+    if not df_monthly.empty and {"month", "total"}.issubset(df_monthly.columns):
         st.bar_chart(df_monthly.set_index("month")["total"], use_container_width=True)
     else:
         st.info("No data")
@@ -85,18 +96,17 @@ with col3:
 
 st.divider()
 
-# ── Summary cards ────────────────────────────────────────────────────────────
-card_col, paynow_col = st.columns(2)
-card_col.metric("Card", f"${card_total:,.2f}")
-paynow_col.metric("PayNow", f"${paynow_total:,.2f}")
+# summary cards
+c1, c2 = st.columns(2)
+c1.metric("Card", f"${card_total:,.2f}")
+c2.metric("PayNow", f"${paynow_total:,.2f}")
 
 st.divider()
 
-# ── Top 5 merchants table ────────────────────────────────────────────────────
+# top 5 merchants table
 st.subheader("Top 5 Merchants")
-
 if not df_merchants.empty:
-    merchant_table = df_merchants.rename(
+    table_df = df_merchants.rename(
         columns={
             "to_merchant": "Merchant",
             "count": "Transactions",
@@ -104,10 +114,7 @@ if not df_merchants.empty:
         }
     )
 
-    st.dataframe(
-        merchant_table[["Merchant", "Transactions", "Total (SGD)"]],
-        use_container_width=True,
-        hide_index=True,
-    )
+    cols = [c for c in ["Merchant", "Transactions", "Total (SGD)"] if c in table_df.columns]
+    st.dataframe(table_df[cols], use_container_width=True, hide_index=True)
 else:
     st.info("No data")
