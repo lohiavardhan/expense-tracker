@@ -211,7 +211,8 @@ def parse_emails(banking=None, **context):
         elif 'PayNow' in subject or 'iBanking' in subject:
             txn_type = 'PayNow'
         else:
-            txn_type = 'Unknown'
+            print(f"Skipping non-transaction email: {subject}")
+            continue
 
         amount = re.search(r'Amount:\s*(SGD[\d,.]+)', text)
         date_match = re.search(r'Date & Time:\s*(.+?)(?:\s{2,}|\n)', text)
@@ -374,12 +375,14 @@ def generate_dashboard(**context):
         ORDER BY total DESC
     """).df()
 
-    top_merchants = con.execute("""
+    excluded_merchants_sql = ", ".join(f"'{m}'" for m in EXCLUDED_MERCHANTS)
+    top_merchants = con.execute(f"""
         SELECT to_merchant,
             COUNT(*) AS count,
             ROUND(SUM(CAST(REPLACE(REPLACE(amount, 'SGD', ''), ',', '') AS DOUBLE)), 2) AS total
         FROM df_cycle
         WHERE to_merchant IS NOT NULL
+          AND to_merchant NOT IN ({excluded_merchants_sql})
         GROUP BY to_merchant
         ORDER BY total DESC
         LIMIT 5
