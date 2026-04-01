@@ -404,7 +404,12 @@ def generate_dashboard(**context):
     """).df()
 
     monthly_spend = con.execute("""
-        SELECT STRFTIME(TRY_CAST(date AS TIMESTAMP), '%Y-%m') AS month,
+        SELECT
+            CASE
+                WHEN DATE_PART('day', TRY_CAST(date AS TIMESTAMP)) >= 15
+                THEN STRFTIME(DATE_TRUNC('month', TRY_CAST(date AS TIMESTAMP)) + INTERVAL '14 days', '%Y-%m-%d')
+                ELSE STRFTIME((DATE_TRUNC('month', TRY_CAST(date AS TIMESTAMP)) - INTERVAL '1 month') + INTERVAL '14 days', '%Y-%m-%d')
+            END AS month,
             COUNT(*) AS count,
             ROUND(SUM(CAST(REPLACE(REPLACE(amount, 'SGD', ''), ',', '') AS DOUBLE)), 2) AS total
         FROM df
