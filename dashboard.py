@@ -70,6 +70,7 @@ df_daily = pd.DataFrame(data.get("daily_spend", []))
 df_monthly = pd.DataFrame(data.get("monthly_spend", []))
 df_type = pd.DataFrame(data.get("spend_by_type", []))
 df_merchants = pd.DataFrame(data.get("top_merchants", []))
+df_today_txns = pd.DataFrame(data.get("today_transactions", []))
 
 today_str = datetime.now(tz=SGT).strftime("%Y-%m-%d")
 cycle_start_default, cycle_end_default = get_cycle_bounds()
@@ -94,6 +95,23 @@ top2.metric("Monthly Spend", f"${monthly_spend_value:,.2f}")
 top3.metric("Total Transactions This Cycle", transactions_this_month)
 
 st.caption(f"Cycle: {cycle_start} to {cycle_end}")
+
+st.divider()
+
+st.subheader("Today's Transactions")
+if not df_today_txns.empty:
+    txn_display = df_today_txns.rename(columns={
+        "time": "Time",
+        "merchant": "Merchant",
+        "amount": "Amount (SGD)",
+    })
+    st.dataframe(
+        txn_display[["Time", "Merchant", "Amount (SGD)"]],
+        use_container_width=True,
+        hide_index=True,
+    )
+else:
+    st.info("No transactions today")
 
 st.divider()
 

@@ -427,6 +427,19 @@ def generate_dashboard(**context):
         ORDER BY 1
     """).df()
 
+    from datetime import timezone as _tz
+    today_sgt = datetime.now(tz=_tz(timedelta(hours=8))).strftime("%Y-%m-%d")
+    today_transactions = con.execute(f"""
+        SELECT
+            STRFTIME(TRY_CAST(date AS TIMESTAMP), '%H:%M') AS time,
+            to_merchant AS merchant,
+            ROUND(CAST(REPLACE(REPLACE(amount, 'SGD', ''), ',', '') AS DOUBLE), 2) AS amount
+        FROM df_cycle
+        WHERE CAST(TRY_CAST(date AS TIMESTAMP) AS DATE) = '{today_sgt}'
+          AND TRY_CAST(date AS TIMESTAMP) IS NOT NULL
+        ORDER BY TRY_CAST(date AS TIMESTAMP) DESC
+    """).df()
+
     monthly_spend = con.execute("""
         SELECT
             CASE
@@ -452,6 +465,7 @@ def generate_dashboard(**context):
     'spend_by_type': json.loads(spend_by_type.to_json(orient='records')),
     'top_merchants': json.loads(top_merchants.to_json(orient='records')),
     'daily_spend': json.loads(daily_spend.to_json(orient='records', date_format='iso')),
+    'today_transactions': json.loads(today_transactions.to_json(orient='records')),
     'monthly_spend': json.loads(monthly_spend.to_json(orient='records')),
     }
 
