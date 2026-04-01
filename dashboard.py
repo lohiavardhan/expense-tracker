@@ -76,19 +76,6 @@ if not df_daily.empty and {"date", "total"}.issubset(df_daily.columns):
 monthly_spend_value = float(data.get("cycle_spend", 0.0))
 transactions_this_month = int(data.get("cycle_transactions", 0))
 
-card_total = 0.0
-paynow_total = 0.0
-if not df_type.empty and {"type", "total"}.issubset(df_type.columns):
-    tmp = df_type.copy()
-    tmp["type_norm"] = tmp["type"].astype(str).str.strip().str.lower()
-
-    card_match = tmp.loc[tmp["type_norm"] == "card", "total"]
-    paynow_match = tmp.loc[tmp["type_norm"] == "paynow", "total"]
-
-    if not card_match.empty:
-        card_total = float(card_match.iloc[0])
-    if not paynow_match.empty:
-        paynow_total = float(paynow_match.iloc[0])
 
 top1, top2, top3, top4 = st.columns(4)
 top1.metric("Daily Spend", f"${daily_spend_value:,.2f}")
@@ -97,12 +84,6 @@ top3.metric("Total Transactions This Cycle", transactions_this_month)
 top4.metric("Current Cycle Merchants", len(df_merchants) if not df_merchants.empty else 0)
 
 st.caption(f"Cycle: {cycle_start} to {cycle_end}")
-
-st.divider()
-
-c1, c2 = st.columns(2)
-c1.metric("Card", f"${card_total:,.2f}")
-c2.metric("PayNow", f"${paynow_total:,.2f}")
 
 st.divider()
 

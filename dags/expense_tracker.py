@@ -17,6 +17,7 @@ from bs4 import BeautifulSoup
 EXCLUDED_MERCHANTS = {
     "Coinbase A/C ending 8646",
     "IFAST FINANCIAL PL-CT SUB",
+    "Vardhan Lohia A/C ending 1467",
 }
 
 # DETECT ENVIRONEMNT
