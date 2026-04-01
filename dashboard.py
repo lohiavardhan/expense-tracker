@@ -1,6 +1,6 @@
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
 import boto3
 import pandas as pd
@@ -10,8 +10,19 @@ from botocore.exceptions import ClientError
 S3_BUCKET = os.environ.get("S3_BUCKET", "expense-tracker-vardhan")
 AWS_REGION = "ap-southeast-1"
 
+SGT = timezone(timedelta(hours=8))
+
 st.set_page_config(page_title="Expense Tracker", layout="wide")
-st.title("Expense Tracker Dashboard")
+
+title_col, date_col = st.columns([3, 1])
+with title_col:
+    st.title("Expense Tracker Dashboard")
+with date_col:
+    st.markdown(
+        f"<div style='text-align:right; padding-top: 12px; font-size: 1.1rem; color: gray;'>"
+        f"{datetime.now(tz=SGT).strftime('%A, %d %B %Y')}</div>",
+        unsafe_allow_html=True,
+    )
 
 
 def get_cycle_bounds(now=None):
@@ -60,7 +71,7 @@ df_monthly = pd.DataFrame(data.get("monthly_spend", []))
 df_type = pd.DataFrame(data.get("spend_by_type", []))
 df_merchants = pd.DataFrame(data.get("top_merchants", []))
 
-today_str = pd.Timestamp.now().strftime("%Y-%m-%d")
+today_str = datetime.now(tz=SGT).strftime("%Y-%m-%d")
 cycle_start_default, cycle_end_default = get_cycle_bounds()
 
 cycle_start = data.get("cycle_start", cycle_start_default.date().isoformat())
