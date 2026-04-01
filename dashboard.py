@@ -71,7 +71,7 @@ if not df_daily.empty and {"date", "total"}.issubset(df_daily.columns):
     df_daily["date"] = pd.to_datetime(df_daily["date"], errors="coerce")
     match = df_daily.loc[df_daily["date"].dt.strftime("%Y-%m-%d") == today_str, "total"]
     if not match.empty:
-        daily_spend_value = float(match.iloc[0])
+        daily_spend_value = float(match.sum())
 
 monthly_spend_value = float(data.get("cycle_spend", 0.0))
 transactions_this_month = int(data.get("cycle_transactions", 0))

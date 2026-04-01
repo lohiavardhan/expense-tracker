@@ -349,6 +349,8 @@ def generate_dashboard(**context):
         return
 
     df = pd.concat(frames, ignore_index=True)
+    if "to_merchant" in df.columns:
+        df = df[~df["to_merchant"].fillna("").isin(EXCLUDED_MERCHANTS)].copy()
     df["parsed_ts"] = pd.to_datetime(df["date"], errors="coerce")
 
     cycle_start, cycle_end = get_cycle_bounds()
@@ -357,8 +359,6 @@ def generate_dashboard(**context):
         (df["parsed_ts"] >= cycle_start) &
         (df["parsed_ts"] < cycle_end)
     ].copy()
-    if "to_merchant" in df.columns:
-        df = df[~df["to_merchant"].fillna("").isin(EXCLUDED_MERCHANTS)].copy()
 
     print("Rows with parsed date:", df["date"].notna().sum() if "date" in df.columns else 0)
     print("Total rows:", len(df))
@@ -400,8 +400,8 @@ def generate_dashboard(**context):
             ROUND(SUM(CAST(REPLACE(REPLACE(amount, 'SGD', ''), ',', '') AS DOUBLE)), 2) AS total
         FROM df
         WHERE TRY_CAST(date AS TIMESTAMP) IS NOT NULL
-        GROUP BY date
-        ORDER BY date
+        GROUP BY 1
+        ORDER BY 1
     """).df()
 
     monthly_spend = con.execute("""
