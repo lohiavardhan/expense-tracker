@@ -130,35 +130,21 @@ bottom_left, bottom_right = st.columns(2)
 with bottom_left:
     st.subheader("Daily Spend Breakdown")
     if not df_daily.empty:
-        daily_table = df_daily.copy()
-        daily_table["date"] = pd.to_datetime(daily_table["date"], errors="coerce")
-        daily_table = daily_table.dropna(subset=["date"]).sort_values("date", ascending=False)
-        daily_table["date"] = daily_table["date"].dt.strftime("%Y-%m-%d")
-        daily_table = daily_table.rename(columns={"date": "Date", "total": "Total (SGD)"})
-        st.dataframe(
-            daily_table[["Date", "Total (SGD)"]],
-            use_container_width=True,
-            hide_index=True,
-        )
+        daily_chart = df_daily.copy()
+        daily_chart["date"] = pd.to_datetime(daily_chart["date"], errors="coerce")
+        daily_chart = daily_chart.dropna(subset=["date"]).sort_values("date")
+        daily_chart = daily_chart.set_index("date")["total"]
+        daily_chart.index.name = "Date"
+        st.line_chart(daily_chart, y_label="Total (SGD)")
     else:
         st.info("No data")
 
 with bottom_right:
     st.subheader("Monthly Spend Breakdown")
     if not df_monthly.empty:
-        monthly_table = df_monthly.copy().sort_values("month", ascending=False)
-        monthly_table = monthly_table.rename(
-            columns={
-                "month": "Month",
-                "count": "Transactions",
-                "total": "Total (SGD)",
-            }
-        )
-        cols = [c for c in ["Month", "Transactions", "Total (SGD)"] if c in monthly_table.columns]
-        st.dataframe(
-            monthly_table[cols],
-            use_container_width=True,
-            hide_index=True,
-        )
+        monthly_chart = df_monthly.copy().sort_values("month")
+        monthly_chart = monthly_chart.set_index("month")["total"]
+        monthly_chart.index.name = "Month"
+        st.bar_chart(monthly_chart, y_label="Total (SGD)")
     else:
         st.info("No data")

@@ -136,20 +136,39 @@ def get_existing_warehouse_ids():
 # FETCH EMAIL
 def fetch_emails(**context):
     service = get_gmail_service()
-    results = service.users().messages().list(
-        userId='me',
-        q='from:ibanking.alert@dbs.com'
-    ).execute()
-    messages = results.get('messages', [])
-    banking_emails = []
 
+    backfill = False
+    if context.get('dag_run') and context['dag_run'].conf:
+        backfill = context['dag_run'].conf.get('backfill', False)
+
+    if backfill:
+        since = (datetime.now() - timedelta(days=365)).strftime('%Y/%m/%d')
+        print(f"Backfill mode: fetching emails since {since}")
+    else:
+        since = (datetime.now() - timedelta(days=2)).strftime('%Y/%m/%d')
+
+    query = f'from:ibanking.alert@dbs.com after:{since}'
+
+    messages = []
+    page_token = None
+    while True:
+        kwargs = {'userId': 'me', 'q': query}
+        if page_token:
+            kwargs['pageToken'] = page_token
+        results = service.users().messages().list(**kwargs).execute()
+        messages.extend(results.get('messages', []))
+        page_token = results.get('nextPageToken')
+        if not page_token:
+            break
+
+    banking_emails = []
     for msg in messages:
         detail = service.users().messages().get(userId='me', id=msg['id']).execute()
         from_header = get_header(detail['payload']['headers'], 'From')
         if from_header and 'ibanking.alert@dbs.com' in from_header:
             banking_emails.append(detail)
 
-    print(f"Fetched {len(banking_emails)} banking emails")
+    print(f"Fetched {len(banking_emails)} banking emails (backfill={backfill})")
 
     # Airflow mode: push to XCom
     if context.get('ti'):
@@ -401,7 +420,7 @@ def generate_dashboard(**context):
     daily_spend = con.execute("""
         SELECT CAST(TRY_CAST(date AS TIMESTAMP) AS DATE) AS date,
             ROUND(SUM(CAST(REPLACE(REPLACE(amount, 'SGD', ''), ',', '') AS DOUBLE)), 2) AS total
-        FROM df
+        FROM df_cycle
         WHERE TRY_CAST(date AS TIMESTAMP) IS NOT NULL
         GROUP BY 1
         ORDER BY 1
