@@ -98,39 +98,41 @@ st.caption(f"Cycle: {cycle_start} to {cycle_end}")
 
 st.divider()
 
-st.subheader("Today's Transactions")
-if not df_today_txns.empty:
-    txn_display = df_today_txns.rename(columns={
-        "time": "Time",
-        "merchant": "Merchant",
-        "amount": "Amount (SGD)",
-    })
-    st.dataframe(
-        txn_display[["Time", "Merchant", "Amount (SGD)"]],
-        use_container_width=True,
-        hide_index=True,
-    )
-else:
-    st.info("No transactions today")
+mid_left, mid_right = st.columns(2)
 
-st.divider()
+with mid_left:
+    st.subheader("Today's Transactions")
+    if not df_today_txns.empty:
+        txn_display = df_today_txns.rename(columns={
+            "time": "Time",
+            "merchant": "Merchant",
+            "amount": "Amount (SGD)",
+        })
+        st.dataframe(
+            txn_display[["Time", "Merchant", "Amount (SGD)"]],
+            use_container_width=True,
+            hide_index=True,
+        )
+    else:
+        st.info("No transactions today")
 
-st.subheader("Top 5 Merchants This Cycle")
-if not df_merchants.empty:
-    table_df = df_merchants.rename(
-        columns={
-            "to_merchant": "Merchant",
-            "count": "Transactions",
-            "total": "Total (SGD)",
-        }
-    )
-    st.dataframe(
-        table_df[["Merchant", "Transactions", "Total (SGD)"]],
-        use_container_width=True,
-        hide_index=True,
-    )
-else:
-    st.info("No data")
+with mid_right:
+    st.subheader("Top 5 Merchants This Cycle")
+    if not df_merchants.empty:
+        table_df = df_merchants.rename(
+            columns={
+                "to_merchant": "Merchant",
+                "count": "Transactions",
+                "total": "Total (SGD)",
+            }
+        )
+        st.dataframe(
+            table_df[["Merchant", "Transactions", "Total (SGD)"]],
+            use_container_width=True,
+            hide_index=True,
+        )
+    else:
+        st.info("No data")
 
 st.divider()
 
