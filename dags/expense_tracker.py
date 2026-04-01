@@ -187,11 +187,12 @@ def load_to_lake(banking=None, **context):
 # PARSE EMAIL
 def parse_emails(banking=None, **context):
     # Airflow mode: pull from XCom
+    if banking is None and context.get('ti'):
+        banking = context['ti'].xcom_pull(task_ids='fetch_emails', key='banking')
+
     if not banking:
         print("No banking emails found to parse")
         return []
-    if banking is None and context.get('ti'):
-        banking = context['ti'].xcom_pull(task_ids='fetch_emails', key='banking')
 
     transactions = []
 
