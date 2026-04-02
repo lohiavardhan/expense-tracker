@@ -9,7 +9,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 S3_BUCKET = os.environ.get("S3_BUCKET", "expense-tracker-vardhan")
-AWS_REGION = "ap-southeast-1"
+AWS_REGION = "us-east-1"
 SGT = timezone(timedelta(hours=8))
 
 app = FastAPI(title="Expense Tracker Widget API")

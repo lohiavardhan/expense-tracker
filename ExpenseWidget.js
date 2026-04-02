@@ -1,6 +1,5 @@
 // Expense Tracker Widget for Scriptable
-// Replace with the IP/hostname of the machine running widget_api.py
-const API_BASE = "http://YOUR_SERVER_IP:8051"
+const API_BASE = "http://98:82:115:127:8051"
 
 async function fetchWidgetData() {
   const url = `${API_BASE}/widget`
