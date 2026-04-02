@@ -17,10 +17,6 @@ from bs4 import BeautifulSoup
 EXCLUDED_MERCHANTS = {
     "Coinbase A/C ending 8646",
     "IFAST FINANCIAL PL-CT SUB",
-}
-
-# Transactions to these accounts are money received — stored as negative expenses
-MONEY_RECEIVED_ACCOUNTS = {
     "Vardhan Lohia A/C ending 1467",
 }
 
@@ -278,21 +274,14 @@ def parse_emails(banking=None, **context):
         date_prefix = datetime.now().strftime('%Y/%m/%d')
         s3_raw_path = f"s3://{S3_BUCKET}/raw/{date_prefix}/{detail['id']}.json" if IS_AWS else None
 
-        to_merchant_val = to_merchant.group(1).strip() if to_merchant else None
-        amount_val = amount.group(1).strip() if amount else None
-
-        # Money received: negate the amount so it reduces total spend
-        if to_merchant_val in MONEY_RECEIVED_ACCOUNTS and amount_val:
-            amount_val = amount_val.replace('SGD', 'SGD-', 1)
-
         transactions.append({
             'email_id': detail['id'],
             'date_raw': raw_date,
             'date': parsed_date,
             'from_account': from_card.group(1).strip() if from_card else None,
-            'to_merchant': to_merchant_val,
+            'to_merchant': to_merchant.group(1).strip() if to_merchant else None,
             'subject': subject,
-            'amount': amount_val,
+            'amount': amount.group(1).strip() if amount else None,
             'type': txn_type,
             's3_raw_path': s3_raw_path,
             'created_at': datetime.now().isoformat(),

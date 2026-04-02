@@ -14,15 +14,7 @@ SGT = timezone(timedelta(hours=8))
 
 st.set_page_config(page_title="Expense Tracker", layout="wide")
 
-title_col, date_col = st.columns([3, 1])
-with title_col:
-    st.title("Expense Tracker Dashboard")
-with date_col:
-    st.markdown(
-        f"<div style='text-align:right; padding-top: 12px; font-size: 1.1rem; color: gray;'>"
-        f"{datetime.now(tz=SGT).strftime('%A, %d %B %Y')}</div>",
-        unsafe_allow_html=True,
-    )
+st.title("Expense Tracker Dashboard")
 
 
 def get_cycle_bounds(now=None):
