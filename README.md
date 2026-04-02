@@ -4,69 +4,12 @@ An automated personal expense tracking pipeline that ingests DBS bank transactio
 
 ## Architecture
 
-```
-                          ┌─────────────────────────────────────────────────────┐
-                          │                   AWS EC2 Instance                  │
-                          │                                                     │
-┌───────────┐             │  ┌──────────────────────────────────────────────┐   │
-│           │  Gmail API  │  │            Apache Airflow (Hourly)           │   │
-│   Gmail   │────────────▶│  │                                              │   │
-│  (DBS     │             │  │   fetch_emails                               │   │
-│  Alerts)  │             │  │       │                                      │   │
-└───────────┘             │  │       ├──────────┐                           │   │
-                          │  │       ▼          ▼                           │   │
-                          │  │   load_to_lake  parse_emails                 │   │
-                          │  │       │          │                           │   │
-                          │  │       ▼          ▼                           │   │
-                          │  │   S3 Raw     load_to_warehouse               │   │
-                          │  │   Layer          │                           │   │
-                          │  │                  ▼                           │   │
-                          │  │           generate_dashboard                 │   │
-                          │  │                  │                           │   │
-                          │  └──────────────────┼──────────────────────────┘   │
-                          │                     │                              │
-                          │                     ▼                              │
-                          │  ┌──────────────────────────────────────────────┐  │
-                          │  │               AWS S3 Bucket                  │  │
-                          │  │                                              │  │
-                          │  │  raw/          Raw email JSON                │  │
-                          │  │  processed/    Parsed transaction JSON       │  │
-                          │  │  warehouse/    Individual Parquet files      │  │
-                          │  │  dashboard/    latest.json (aggregated)      │  │
-                          │  └──────────────────────────────────────────────┘  │
-                          │         │                          │               │
-                          │         ▼                          ▼               │
-                          │  ┌──────────────┐     ┌────────────────────┐      │
-                          │  │  Streamlit    │     │  FastAPI Widget    │      │
-                          │  │  Dashboard    │     │  API (:8051)       │      │
-                          │  │  (:8501)      │     │                    │      │
-                          │  └──────┬───────┘     └─────────┬──────────┘      │
-                          └─────────┼───────────────────────┼─────────────────┘
-                                    │                       │
-                                    ▼                       ▼
-                             ┌────────────┐         ┌──────────────┐
-                             │  Browser   │         │  iPhone      │
-                             │            │         │  Scriptable  │
-                             │            │         │  Widget      │
-                             └────────────┘         └──────────────┘
-```
-
-## Airflow DAG
-
-```
-fetch_emails ──┬──▶ load_to_lake        (raw JSON → S3 raw/)
-               │
-               └──▶ parse_emails        (extract transaction fields)
-                         │
-                         ▼
-                    load_to_warehouse    (deduplicate → S3 warehouse/ as Parquet)
-                         │
-                         ▼
-                    generate_dashboard   (aggregate with DuckDB → S3 dashboard/latest.json)
-```
+<p align="center">
+  <img src="docs/architecture.svg" alt="Architecture Diagram" width="900"/>
+</p>
 
 - **Schedule**: `@hourly`
-- **Lookback**: 2 days (normal), 365 days (backfill mode)
+- **Lookback**: Since last successful run (falls back to 2 days), 365 days (backfill mode)
 - **Deduplication**: by `email_id` against existing warehouse Parquet files
 
 ## Data Flow
