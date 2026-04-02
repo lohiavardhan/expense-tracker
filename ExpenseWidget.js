@@ -25,7 +25,7 @@ async function createWidget(data) {
   todayValue.font = Font.boldSystemFont(22)
   todayValue.textColor = Color.white()
 
-  widget.addSpacer(12)
+  widget.addSpacer(24)
 
   const cycleLabel = widget.addText("THIS CYCLE")
   cycleLabel.font = Font.systemFont(11)
@@ -36,6 +36,8 @@ async function createWidget(data) {
   cycleValue.textColor = Color.white()
 
   widget.addSpacer()
+
+  widget.url = "http://98.82.115.127:8501/"
 
   return widget
 }
