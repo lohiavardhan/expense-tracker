@@ -1,5 +1,5 @@
 // Expense Tracker Widget for Scriptable
-const API_BASE = "http://98:82:115:127:8051"
+const API_BASE = "http://98.82.115.127:8051"
 
 async function fetchWidgetData() {
   const url = `${API_BASE}/widget`
