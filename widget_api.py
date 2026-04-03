@@ -42,7 +42,7 @@ def get_widget_data():
     daily_spend = 0.0
     for entry in data.get("daily_spend", []):
         date_val = entry.get("date", "")
-            if isinstance(date_val, str) and date_val[:10] == today_str:
+        if isinstance(date_val, str) and date_val[:10] == today_str:
             daily_spend += float(entry.get("total", 0))
 
     monthly_spend = float(data.get("cycle_spend", 0.0))
