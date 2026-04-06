@@ -51,8 +51,19 @@ def get_gmail_service():
             creds.refresh(Request())
             with open(TOKEN_PATH, 'w') as token:
                 token.write(creds.to_json())
+            print("Token refreshed successfully")
         else:
-            raise Exception(f"No valid token at {TOKEN_PATH}")
+            raise Exception(
+                f"No valid credentials. The refresh token may have expired "
+                f"(this happens when the Google Cloud app is in 'Testing' mode). "
+                f"Fix: 1) Set your app to 'Production' in Google Cloud Console → "
+                f"OAuth consent screen, 2) Re-generate {TOKEN_PATH} once."
+            )
+    elif creds.expiry and creds.expiry.replace(tzinfo=None) - datetime.now() < timedelta(minutes=10):
+        creds.refresh(Request())
+        with open(TOKEN_PATH, 'w') as token:
+            token.write(creds.to_json())
+        print("Token proactively refreshed (was close to expiry)")
     return build('gmail', 'v1', credentials=creds)
 
 def get_cycle_bounds(now=None):
