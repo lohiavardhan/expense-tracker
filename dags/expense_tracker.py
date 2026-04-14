@@ -268,6 +268,11 @@ def parse_emails(banking=None, **context):
         to_merchant = re.search(r'To:\s*(.+?)(?:\s*\(UEN|\s*If\s|(?:\s{2,}|\n))', text)
         from_card = re.search(r'From:\s*(.+?)(?:\s{2,}|\n)', text)
 
+        # If from_account is Vardhan Lohia's account, it's an incoming self-transfer
+        from_account_str = from_card.group(1).strip() if from_card else ''
+        if VARDHAN_LOHIA_ACCOUNT.lower() in from_account_str.lower():
+            direction = 'incoming'
+
         email_date_header = get_header(headers, "Date")
         email_dt = None
         if email_date_header:
