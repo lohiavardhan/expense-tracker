@@ -251,12 +251,23 @@ def parse_emails(banking=None, **context):
         subject = get_header(headers, 'Subject') or ''
         subject_lower = subject.lower()
 
-        # Detect incoming transfer emails (digibank Alerts format)
-        if 'received a transfer' in subject_lower or 'received a paynow' in subject_lower:
-            txn_type = 'Transfer'
-            direction = 'incoming'
+        # Determine transaction type and direction
+        is_incoming = 'received' in subject_lower or 'credit' in subject_lower
 
-            # Parse incoming format: "You have received SGD 200.00 via FAST transfer on 29 Mar 2026 09:44 SGT"
+        if 'Card' in subject:
+            txn_type = 'Card'
+        elif 'PayNow' in subject or 'iBanking' in subject:
+            txn_type = 'PayNow'
+        elif is_incoming:
+            txn_type = 'Transfer'
+        else:
+            print(f"Skipping non-transaction email: {subject}")
+            continue
+
+        if is_incoming:
+            direction = 'incoming'
+            # Parse digibank incoming format:
+            # "You have received SGD 200.00 via FAST transfer on 29 Mar 2026 09:44 SGT."
             amount = re.search(r'received\s+(SGD\s?[\d,.]+)', text)
             date_match = re.search(r'on\s+(\d+\s+\w+\s+\d{4}\s+\d+:\d+)\s+SGT', text)
             from_card = re.search(r'From:\s*(.+?)(?:\s{2,}|\n)', text)
@@ -271,22 +282,8 @@ def parse_emails(banking=None, **context):
                         break
                     except ValueError:
                         pass
-
-        elif 'Card' in subject:
-            txn_type = 'Card'
-            direction = 'outgoing'
-        elif 'PayNow' in subject or 'iBanking' in subject:
-            txn_type = 'PayNow'
-            if 'credit' in subject_lower or 'received' in subject_lower:
-                direction = 'incoming'
-            else:
-                direction = 'outgoing'
         else:
-            print(f"Skipping non-transaction email: {subject}")
-            continue
-
-        # For outgoing/standard format, parse fields the normal way
-        if direction != 'incoming' or txn_type != 'Transfer':
+            direction = 'outgoing'
             amount = re.search(r'Amount:\s*(SGD[\d,.]+)', text)
             date_match = re.search(r'Date & Time:\s*(.+?)(?:\s{2,}|\n)', text)
             to_merchant = re.search(r'To:\s*(.+?)(?:\s*\(UEN|\s*If\s|(?:\s{2,}|\n))', text)
