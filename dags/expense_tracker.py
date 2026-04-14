@@ -560,7 +560,5 @@ with DAG(
     t2 = PythonOperator(task_id='parse_emails', python_callable=parse_emails)
     t3 = PythonOperator(task_id='load_to_warehouse', python_callable=load_to_warehouse)
     t4 = PythonOperator(task_id='generate_dashboard', python_callable=generate_dashboard)
-    t_repair = PythonOperator(task_id='repair_warehouse', python_callable=repair_warehouse)
-
     t1 >> t_lake
     t1 >> t2 >> t3 >> t4
