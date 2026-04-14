@@ -330,12 +330,22 @@ def parse_emails(banking=None, **context):
         date_prefix = datetime.now().strftime('%Y/%m/%d')
         s3_raw_path = f"s3://{S3_BUCKET}/raw/{date_prefix}/{detail['id']}.json"
 
+        from_account_val = from_card.group(1).strip() if from_card else None
+        to_merchant_val = to_merchant.group(1).strip() if to_merchant else None
+
+        # For incoming, use the sender as the merchant so it groups with outgoing to same person
+        if direction == 'incoming' and from_account_val:
+            to_merchant_val = from_account_val
+            # Normalize "Vardhan Lohia" to "Vardhan Lohia A/C ending 1467"
+            if VARDHAN_LOHIA_NAME in from_account_val.lower():
+                to_merchant_val = "Vardhan Lohia A/C ending 1467"
+
         transactions.append({
             'email_id': detail['id'],
             'date_raw': raw_date,
             'date': parsed_date,
-            'from_account': from_card.group(1).strip() if from_card else None,
-            'to_merchant': to_merchant.group(1).strip() if to_merchant else None,
+            'from_account': from_account_val,
+            'to_merchant': to_merchant_val,
             'subject': subject,
             'amount': amount.group(1).strip() if amount else None,
             'type': txn_type,
