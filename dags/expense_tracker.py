@@ -28,7 +28,7 @@ EXCLUDED_MERCHANTS = {
     "IFAST FINANCIAL PL-CT SUB",
 }
 
-VARDHAN_LOHIA_ACCOUNT = "Vardhan Lohia A/C ending 1467"
+VARDHAN_LOHIA_NAME = "vardhan lohia"
 
 SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
 TOKEN_PATH = '/home/ubuntu/expense-tracker/token.json'
@@ -268,7 +268,8 @@ def parse_emails(banking=None, **context):
             direction = 'incoming'
             # Parse digibank incoming format:
             # "You have received SGD 200.00 via FAST transfer on 29 Mar 2026 09:44 SGT."
-            amount = re.search(r'received\s+(SGD\s?[\d,.]+)', text)
+            # Use \s+ to handle non-breaking spaces and varying whitespace from HTML parsing
+            amount = re.search(r'(SGD\s*[\d,.]+)', text)
             date_match = re.search(r'on\s+(\d+\s+\w+\s+\d{4}\s+\d+:\d+)\s+SGT', text)
             from_card = re.search(r'From:\s*(.+?)(?:\s{2,}|\n)', text)
             to_merchant = re.search(r'To:\s*(.+?)(?:\s{2,}|\n)', text)
@@ -289,9 +290,9 @@ def parse_emails(banking=None, **context):
             to_merchant = re.search(r'To:\s*(.+?)(?:\s*\(UEN|\s*If\s|(?:\s{2,}|\n))', text)
             from_card = re.search(r'From:\s*(.+?)(?:\s{2,}|\n)', text)
 
-            # If from_account is Vardhan Lohia's account, it's an incoming self-transfer
+            # If from_account contains Vardhan Lohia, it's an incoming self-transfer
             from_account_str = from_card.group(1).strip() if from_card else ''
-            if VARDHAN_LOHIA_ACCOUNT.lower() in from_account_str.lower():
+            if VARDHAN_LOHIA_NAME in from_account_str.lower():
                 direction = 'incoming'
 
             email_date_header = get_header(headers, "Date")
