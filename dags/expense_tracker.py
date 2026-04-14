@@ -545,62 +545,6 @@ def generate_dashboard(**context):
 
 
 
-def repair_warehouse(**context):
-    """One-time repair: re-fetch ALL DBS emails, re-parse, and rebuild the warehouse."""
-    service = get_gmail_service()
-
-    query = 'from:ibanking.alert@dbs.com'
-    print(f"Repair: fetching ALL emails with query: {query}")
-
-    messages = []
-    page_token = None
-    while True:
-        kwargs = {'userId': 'me', 'q': query}
-        if page_token:
-            kwargs['pageToken'] = page_token
-        results = service.users().messages().list(**kwargs).execute()
-        messages.extend(results.get('messages', []))
-        page_token = results.get('nextPageToken')
-        if not page_token:
-            break
-
-    print(f"Repair: found {len(messages)} total emails")
-
-    banking_emails = []
-    for msg in messages:
-        detail = service.users().messages().get(userId='me', id=msg['id']).execute()
-        from_header = get_header(detail['payload']['headers'], 'From')
-        if from_header and 'ibanking.alert@dbs.com' in from_header:
-            banking_emails.append(detail)
-
-    print(f"Repair: {len(banking_emails)} banking emails to re-parse")
-
-    transactions = parse_emails(banking=banking_emails)
-    if not transactions:
-        print("Repair: no transactions parsed")
-        return
-
-    # Rebuild warehouse from scratch
-    new_table = pa.table({k: [txn[k] for txn in transactions] for k in transactions[0]})
-
-    buf = io.BytesIO()
-    pq.write_table(new_table, buf, compression='snappy')
-    buf.seek(0)
-
-    s3.put_object(
-        Bucket=S3_BUCKET,
-        Key=WAREHOUSE_KEY,
-        Body=buf.getvalue(),
-        ContentType='application/octet-stream',
-    )
-
-    print(f"Repair: rebuilt warehouse with {len(transactions)} transactions")
-
-    # Regenerate dashboard
-    generate_dashboard()
-    print("Repair: dashboard regenerated")
-
-
 with DAG(
     dag_id='expense_tracker',
     default_args=default_args,
