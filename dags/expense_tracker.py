@@ -504,7 +504,7 @@ def generate_dashboard(**context):
         ORDER BY TRY_CAST(date AS TIMESTAMP) DESC
     """).df()
 
-    monthly_spend = con.execute("""
+        monthly_spend = con.execute("""
         SELECT
             CASE
                 WHEN DATE_PART('day', TRY_CAST(date AS TIMESTAMP)) >= 15
@@ -512,9 +512,10 @@ def generate_dashboard(**context):
                 ELSE STRFTIME((DATE_TRUNC('month', TRY_CAST(date AS TIMESTAMP)) - INTERVAL '1 month') + INTERVAL '14 days', '%Y-%m-%d')
             END AS month,
             COUNT(*) AS count,
-            ROUND(SUM((CASE WHEN direction = 'incoming' THEN -1.0 ELSE 1.0 END) * CAST(REPLACE(REPLACE(REPLACE(amount, 'SGD', ''), ',', ''), ' ', '') AS DOUBLE)), 2) AS total
+            ROUND(SUM((CASE WHEN direction = 'incoming' THEN -1.0 ELSE 1.0 END) * CAST(REPLACE(REPLACE(amount, 'SGD', ''), ',', '') AS DOUBLE)), 2) AS total
         FROM df
         WHERE TRY_CAST(date AS TIMESTAMP) IS NOT NULL
+          AND TRY_CAST(date AS TIMESTAMP) >= CURRENT_TIMESTAMP - INTERVAL '1 year'
         GROUP BY month
         ORDER BY month
     """).df()
