@@ -504,7 +504,7 @@ def generate_dashboard(**context):
         ORDER BY TRY_CAST(date AS TIMESTAMP) DESC
     """).df()
 
-        monthly_spend = con.execute("""
+    monthly_spend = con.execute("""
         SELECT
             CASE
                 WHEN DATE_PART('day', TRY_CAST(date AS TIMESTAMP)) >= 15
